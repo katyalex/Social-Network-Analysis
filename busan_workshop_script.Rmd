@@ -1,0 +1,175 @@
+---
+title: "Social Network Analysis with R"
+output:
+  html_notebook: default
+  pdf_document: default
+  word_document: default
+---
+
+Brief introduction into R Network analysis
+```{r}
+library(sna)
+library(xlsx)
+library(statnet)
+library(igraph)
+```
+
+Data analysis
+1. Data representation
+Network data in R could be represented in the form of 
+1) adjacency matrices 
+2) nodes with attributes
+```{r}
+setwd("D:\\KSHAP DATA\\busan_workshop")
+mat = read.csv('w1mat.csv', header = T,row.names=1)
+node = read.xlsx('w1node.xlsx', sheetIndex = 1) #attributes of the nodes (sex, age, education, mmse, cesd)
+node = node[1:7]
+head(node)
+```
+Create graph object to analyze. First tell R that mat file is a matrix, then call function as.network to turn it into network object for the further analysis. 
+```{r}
+m2 = as.matrix(mat)
+net = as.network(m2)
+```
+Brief stats with network.
+First it is necessary to assign attributes to nodes in the network. In case of KSHAP it is age, level of depression (cesd) and sex.
+```{r}
+list.network.attributes(net)
+set.network.attribute(net, 'age', node$age)
+set.network.attribute(net,'cesd', node$cesd_c)
+set.network.attribute(net, 'sex', node$sex)
+list.network.attributes(net)
+```
+3.3 Description and Visualization
+<p>Next are common characteristics of the graph.</p>
+<p>Directed means whether relationships are directed or not. Loops mean if somebody pointed on himself (rarely possible with social network)</p>
+```{r}
+net # Get an overall summary
+```
+
+```{r}
+network.dyadcount(net) # How many dyads in network?
+network.edgecount(net) # How many edges are present?
+network.size(net) # How large is the network?
+```
+Next function gives a brief image of the network object. It is possible to customize plot to make it look niecer.
+```{r}
+par(mfrow = c( 1, 2 ))
+plot(net,displaylabels=F) # Plot with names
+gplot(m2) # gplot Will work with a matrix object too
+```
+
+```{r}
+#To get more info
+?summary.network #summary on the whole network
+?network.dyadcount
+?network.edgecount 
+?as.sociomatrix #network in the form of square matrix
+?is.directed #Boolean: whether network is directed or not
+?ego.extract() #Extract Egocentric Networks from Complete Network Data
+```
+
+Simple descriptive statistic on the whole network. 
+
+```{r}
+gden(net) # density of the whole network
+grecip(net, measure = 'edgewise') # proportion of relations that are symmetric (how many pairs of people pointed to each other)
+gtrans(net) # transitivity
+connectedness(net)
+
+#number of isolates in a graph
+length(isolates(net))
+```
+Dyad and triad census
+Dyad.census function retrievs a matrix with 3 columns of mutual, assymetric and  null dyads for the graph.
+Triad.census function retrievs a matrix with 16 columns (each column for possible triad form;)
+<center> ![](D:\\KSHAP DATA\\busan_workshop\\triad.jpg) </center> 
+
+```{r}
+
+sna::dyad.census(net) 
+sna::triad.census(net)
+```
+
+1. Centrality measures: in-degree and out-degree centrality
+<p>P.S. Packages sna and igraph in R contain identical functions (e.g. degree), so if both packages are now in the work space, it is neccessary specify the package from which the function is used by adding "sna::" before function.</p>
+```{r}
+outdegree = sna::degree(net, cmode = "outdegree" )
+indegree = sna::degree(net, cmode = 'indegree')
+degreeall = sna::degree(net, cmode = 'freeman')
+par(mfrow = c( 1, 2 ))
+hist( outdegree )
+hist(indegree)
+quantile(outdegree)
+mean(degreeall)
+```
+
+
+2. Embeddedness: k-core score 
+```{r}
+kcore = kcores(net)
+table(kcore)
+mean(kcore)
+hist(kcore, xlab = 'K-core score')
+```
+
+3. Brokerage (computed from package igraph): Burt's constraint measure
+```{r}
+net2 = graph_from_adjacency_matrix(m2)
+constraint = constraint(net2)
+hist(constraint, xlab = 'Social constraint')
+```
+
+```{r}
+node$constraint=constraint
+head(node)
+```
+
+```{r}
+node$cesd = as.numeric(node$cesd_c)
+m1 = lm(cesd ~ age+sex+constraint, data = node, na.action = na.exclude)
+summary(m1)
+```
+
+```{r}
+library(ggplot2)
+library(RColorBrewer)
+pred = predict(m1)
+ggplot(node, aes(x = node$constraint, y = pred)) +
+  geom_point() +
+  geom_point(aes(y = pred), shape = 1)+geom_point(col = 'steelblue', size=1)+ geom_smooth(method="lm",col="firebrick")+xlab("Constraint") + ylab("Predicted values of loneliness")+scale_x_continuous(breaks=seq(0, 1.2, 0.2))   # Add the predicted values
+```
+
+Network vizualization (igraph package)
+```{r}
+net2 = set.vertex.attribute(net2, 'age',index = V(net2), value = node$age)
+net2 = set.vertex.attribute(net2, 'cesd', value = node$cesd)
+net2 = set.vertex.attribute(net2, 'sex',value = node$sex)
+```
+
+```{r}
+list.vertex.attributes(net2)
+```
+
+On the next graph it can be seen that there is kind of gender segregation among respondents in the village. Red color represents women, and blue color - men. 
+```{r}
+sex = node$sex+1
+colrs = c('red','steelblue')
+V(net2)$color = colrs[sex]
+V(net2)$size <- kcore1*0.8
+V(net2)$frame.color = 'black'
+lay1 = layout_nicely(net2)
+pl1 = plot(net2, vertex.label = NA, edge.arrow.size=0.1, layout = lay1)
+```
+
+This graph represents in color the amount of depression among respondents!
+```{r}
+lonely1 = node$cesd+2
+colrs = brewer.pal(9, 'Blues')
+V(net2)$color = colrs[lonely1]
+V(net2)$size <- 4
+V(net2)$frame.color = 'black'
+lay1 = layout_nicely(net2)
+pl1 = plot(net2, vertex.label = NA, edge.arrow.size=0.1, layout = lay1)
+```
+
