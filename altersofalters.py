@@ -10,7 +10,7 @@ import os
 
 
 os.chdir('D:\\Yonsei\\2018년 2학기\\Mortality and providing social support')
-table = pd.read_stata('w1.dta') #데이터 읽기
+table = pd.read_stata('w1.dta') 
 newdf = table[['nid', 'n_nid_1','n_nid_2','n_nid_3', 'n_nid_4', 'n_nid_5', 'n_nid_6', 'n_nid_7','wave','komsano', 'n_komsa_1', 'n_komsa_2','n_komsa_3','n_komsa_4','n_komsa_5','n_komsa_6','n_komsa_7']]
 
 
